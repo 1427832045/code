@@ -1,3 +1,5 @@
-## alexnet在mnist数据集的实战
-### alexnet-mnist.py 为训练及保存模型
-### alexnet-mnist-test.py 为加载模型参数进行预测
+alexnet在mnist数据集的实战
+
+1.alexnet-mnist.py 为训练及保存模型
+
+2.alexnet-mnist-test.py 为加载模型参数进行预测
