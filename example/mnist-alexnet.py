@@ -203,13 +203,15 @@ TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 train_log_dir = 'tensorboard/train/' + TIMESTAMP
 writer_train = tf.summary.FileWriter(train_log_dir,sess.graph)
 
-saver = tf.train.Saver() 
+
 merged = tf.summary.merge_all()
 # 初始化全局变量
 tf.global_variables_initializer().run()
 
 
 ##训练过程
+saver=tf.train.Saver(max_to_keep=1)
+max_acc=0
 
 for i in range(25000):
     batch = mnist.train.next_batch(100)
@@ -220,13 +222,17 @@ for i in range(25000):
         print ('After step %d, training accuracy %g' % (i, train_accuracy),'training loss is %f'%(loss_value))
         summary, _ = sess.run([merged, train_step],feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
         writer_train.add_summary(summary, i)
+
+        if train_accuracy>max_acc:
+            max_acc=train_accuracy
+            saver.save(sess,"Model_save/mnist-alexnet-model4.ckpt",global_step=i+1)
         #cross_entropy=sess.run(train_step,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.75})
         #print ('step %d, loss %f'%(i, cross_entropy))
     #loss=sess.run(train_step,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
     #print (loss)
     #train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
 
-saver.save(sess, "Model_save/mnist-alexnet-model3.ckpt")
+#saver.save(sess, "Model_save/mnist-alexnet-model3.ckpt")
 
 ##测试过程
 print('test accuracy %g' % accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels,keep_prob:1}))
