@@ -192,7 +192,9 @@ train_step = tf.train.AdagradOptimizer(1e-3).minimize(cross_entropy)
 # 计算准确率
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-tf.summary.scalar('accuracy', accuracy)
+trainaccuracy=tf.summary.scalar('trainaccuracy', accuracy)
+testaccuracy=tf.summary.scalar('testaccuracy', accuracy)
+valaccuracy=tf.summary.scalar('valaccuracy', accuracy)
 
 # tf.summary.scalar("validation_accuracy", accuracy)
 
@@ -204,15 +206,17 @@ train_log_dir = 'tensorboard/train/' + TIMESTAMP
 writer_train = tf.summary.FileWriter(train_log_dir,sess.graph)
 
 
-# test_log_dir = 'tensorboard/test/' + TIMESTAMP
-# writer_test = tf.summary.FileWriter(test_log_dir)
+test_log_dir = 'tensorboard/test/' + TIMESTAMP
+writer_test = tf.summary.FileWriter(test_log_dir)
 
-# val_log_dir = 'tensorboard/val/' + TIMESTAMP
-# writer_val = tf.summary.FileWriter(val_log_dir)
 
-merged = tf.summary.merge_all()
-# merge_summary1 = tf.summary.merge(train_accuracy)
-# merge_summary2 = tf.summary.merge(validation_accuracy)
+val_log_dir = 'tensorboard/val/' + TIMESTAMP
+writer_val = tf.summary.FileWriter(val_log_dir)
+
+#merged = tf.summary.merge_all()
+merge_summary1 = tf.summary.merge([trainaccuracy])
+merge_summary2 = tf.summary.merge([testaccuracy])
+merge_summary3 = tf.summary.merge([valaccuracy])
 
 # 初始化全局变量
 tf.global_variables_initializer().run()
@@ -222,14 +226,14 @@ tf.global_variables_initializer().run()
 saver=tf.train.Saver(max_to_keep=1)
 max_acc=0
 
-for i in range(1000):
+for i in range(30000):
     batch = mnist.train.next_batch(100)
     if i % 100 == 0:
         train_accuracy = accuracy.eval(feed_dict={x: batch[0], y_: batch[1],keep_prob:0.9})
         #print('step %d, training accuracy %g' % (i, train_accuracy))
         loss_value = sess.run(cross_entropy,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
         print ('After step %d, training accuracy %g' % (i, train_accuracy),'training loss is %f'%(loss_value))
-        summary, _ = sess.run([merged, train_step],feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
+        summary,_= sess.run([merge_summary1,train_step],feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
         writer_train.add_summary(summary, i)
 
         if train_accuracy>max_acc:
@@ -238,22 +242,25 @@ for i in range(1000):
 
 
         #测试过程
-batch = mnist.test.next_batch(100)
-test_accuracy=accuracy.eval(feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
-# print('test accuracy %g' % accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels,keep_prob:1}))
-# _, test_loss_value = sess.run([train_step, cross_entropy],feed_dict={x: mnist.test.images, y_: mnist.test.labels,keep_prob:1})
-test_loss_value = sess.run(cross_entropy,feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
-print ('test accuracy %g' % (test_accuracy),',test loss is %f'%(test_loss_value))
-        # summary2, _ = sess.run([merge_summary2, train_step],feed_dict={x: mnist.test.images, y_: mnist.test.labels,keep_prob:1})
-        # writer_test.add_summary(summary2)
+        batch1 = mnist.test.next_batch(100)
+        test_accuracy=accuracy.eval(feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
+        test_loss_value = sess.run(cross_entropy,feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
+        print ('test accuracy %g' % (test_accuracy),',test loss is %f'%(test_loss_value))
+        summary2,_= sess.run([merge_summary2,train_step],feed_dict={x: batch1[0], y_: batch1[1],keep_prob:1})
+        writer_test.add_summary(summary2,i)
 
 
         #验证过程
-x_val, y_val = mnist.validation.next_batch(100)
-validate_feed = {x: x_val, y_: y_val,keep_prob: 1.0}
-validate_accuracy = sess.run(accuracy, feed_dict=validate_feed)
-val_loss_value = sess.run(cross_entropy,feed_dict=validate_feed)
-print ('validation accuracy is %g' % (validate_accuracy),',val loss is %f'%(val_loss_value))
+        x_val, y_val = mnist.validation.next_batch(100)
+        validate_feed = {x: x_val, y_: y_val,keep_prob: 1.0}
+        validate_accuracy = sess.run(accuracy, feed_dict=validate_feed)
+        val_loss_value = sess.run(cross_entropy,feed_dict=validate_feed)
+        print ('validation accuracy is %g' % (validate_accuracy),',val loss is %f'%(val_loss_value))
+
+        summary3,_= sess.run([merge_summary3,train_step],feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
+        writer_val.add_summary(summary3,i)
+
+
         # summary, validate_accuracy = sess.run([merged, validate_accuracy],feed_dict=validate_feed)
         # writer_val.add_summary(summary,i)
         #cross_entropy=sess.run(train_step,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.75})
@@ -264,316 +271,165 @@ print ('validation accuracy is %g' % (validate_accuracy),',val loss is %f'%(val_
 
 #saver.save(sess, "Model_save/mnist-alexnet-model3.ckpt")
 
-##训练过程
-# After step 0, training accuracy 0.08 training loss is 17.736095
-# After step 100, training accuracy 0.05 training loss is 20.160532
-# After step 200, training accuracy 0.04 training loss is 21.457884
-# After step 300, training accuracy 0.08 training loss is 20.909039
-# After step 400, training accuracy 0.1 training loss is 21.183775
-# W0724 15:46:59.093833 47833230480256 deprecation.py:323] From /share/home/flt/flt_data/python3/lib/python3.6/site-packages/tensorflow/python/training/saver.py:960: remove_checkpoint (from tensorflow.python.training.checkpoint_management) is deprecated and will be removed in a future version.
-# Instructions for updating:
-# Use standard file APIs to delete files with this prefix.
-# After step 500, training accuracy 0.13 training loss is 20.493006
-# After step 600, training accuracy 0.08 training loss is 20.652809
-# After step 700, training accuracy 0.1 training loss is 20.492990
-# After step 800, training accuracy 0.12 training loss is 20.373852
-# After step 900, training accuracy 0.1 training loss is 19.947857
-# After step 1000, training accuracy 0.17 training loss is 18.889069
-# After step 1100, training accuracy 0.14 training loss is 19.987909
-# After step 1200, training accuracy 0.16 training loss is 19.230265
-# After step 1300, training accuracy 0.1 training loss is 20.491203
-# After step 1400, training accuracy 0.12 training loss is 20.109844
-# After step 1500, training accuracy 0.13 training loss is 19.982796
-# After step 1600, training accuracy 0.17 training loss is 19.620068
-# After step 1700, training accuracy 0.09 training loss is 20.978941
-# After step 1800, training accuracy 0.07 training loss is 21.204811
-# After step 1900, training accuracy 0.1 training loss is 20.262749
-# After step 2000, training accuracy 0.11 training loss is 19.871660
-# After step 2100, training accuracy 0.11 training loss is 20.159481
-# After step 2200, training accuracy 0.13 training loss is 19.216852
-# After step 2300, training accuracy 0.12 training loss is 20.656723
-# After step 2400, training accuracy 0.12 training loss is 18.392149
-# After step 2500, training accuracy 0.16 training loss is 18.509066
-# After step 2600, training accuracy 0.27 training loss is 16.681864
-# After step 2700, training accuracy 0.27 training loss is 16.378202
-# After step 2800, training accuracy 0.24 training loss is 17.855186
-# After step 2900, training accuracy 0.23 training loss is 16.645983
-# After step 3000, training accuracy 0.17 training loss is 16.842300
-# After step 3100, training accuracy 0.3 training loss is 16.428062
-# After step 3200, training accuracy 0.15 training loss is 19.172789
-# After step 3300, training accuracy 0.16 training loss is 18.649330
-# After step 3400, training accuracy 0.14 training loss is 19.091053
-# After step 3500, training accuracy 0.21 training loss is 16.927349
-# After step 3600, training accuracy 0.18 training loss is 18.649342
-# After step 3700, training accuracy 0.16 training loss is 19.807447
-# After step 3800, training accuracy 0.12 training loss is 19.333038
-# After step 3900, training accuracy 0.16 training loss is 18.991861
-# After step 4000, training accuracy 0.11 training loss is 18.943796
-# After step 4100, training accuracy 0.18 training loss is 17.834969
-# After step 4200, training accuracy 0.29 training loss is 16.461004
-# After step 4300, training accuracy 0.23 training loss is 17.454000
-# After step 4400, training accuracy 0.18 training loss is 18.088390
-# After step 4500, training accuracy 0.2 training loss is 18.190601
-# After step 4600, training accuracy 0.16 training loss is 19.187857
-# After step 4700, training accuracy 0.23 training loss is 17.621605
-# After step 4800, training accuracy 0.18 training loss is 18.224733
-# After step 4900, training accuracy 0.31 training loss is 15.775989
-# After step 5000, training accuracy 0.25 training loss is 16.053364
-# After step 5100, training accuracy 0.21 training loss is 17.985643
-# After step 5200, training accuracy 0.29 training loss is 16.470892
-# After step 5300, training accuracy 0.21 training loss is 17.825048
-# After step 5400, training accuracy 0.18 training loss is 18.806517
-# After step 5500, training accuracy 0.23 training loss is 17.178345
-# After step 5600, training accuracy 0.21 training loss is 17.176056
-# After step 5700, training accuracy 0.26 training loss is 16.757114
-# After step 5800, training accuracy 0.2 training loss is 17.197386
-# After step 5900, training accuracy 0.27 training loss is 16.473433
-# After step 6000, training accuracy 0.32 training loss is 15.717622
-# After step 6100, training accuracy 0.22 training loss is 17.415268
-# After step 6200, training accuracy 0.19 training loss is 17.988022
-# After step 6300, training accuracy 0.2 training loss is 18.769417
-# After step 6400, training accuracy 0.15 training loss is 18.802408
-# After step 6500, training accuracy 0.27 training loss is 16.778711
-# After step 6600, training accuracy 0.26 training loss is 17.559298
-# After step 6700, training accuracy 0.34 training loss is 15.595689
-# After step 6800, training accuracy 0.27 training loss is 15.847251
-# After step 6900, training accuracy 0.31 training loss is 15.704062
-# After step 7000, training accuracy 0.23 training loss is 17.603964
-# After step 7100, training accuracy 0.24 training loss is 17.868847
-# After step 7200, training accuracy 0.12 training loss is 19.131874
-# After step 7300, training accuracy 0.36 training loss is 13.246341
-# After step 7400, training accuracy 0.26 training loss is 16.349833
-# After step 7500, training accuracy 0.39 training loss is 13.818157
-# After step 7600, training accuracy 0.25 training loss is 16.388950
-# After step 7700, training accuracy 0.23 training loss is 15.516763
-# After step 7800, training accuracy 0.19 training loss is 18.292051
-# After step 7900, training accuracy 0.25 training loss is 16.014223
-# After step 8000, training accuracy 0.33 training loss is 15.942495
-# After step 8100, training accuracy 0.24 training loss is 15.601926
-# After step 8200, training accuracy 0.28 training loss is 13.742344
-# After step 8300, training accuracy 0.14 training loss is 17.764210
-# After step 8400, training accuracy 0.21 training loss is 18.056938
-# After step 8500, training accuracy 0.21 training loss is 17.323259
-# After step 8600, training accuracy 0.35 training loss is 13.350826
-# After step 8700, training accuracy 0.24 training loss is 17.780815
-# After step 8800, training accuracy 0.37 training loss is 14.645062
-# After step 8900, training accuracy 0.25 training loss is 15.438651
-# After step 9000, training accuracy 0.3 training loss is 14.258685
-# After step 9100, training accuracy 0.17 training loss is 17.235603
-# After step 9200, training accuracy 0.24 training loss is 16.544779
-# After step 9300, training accuracy 0.35 training loss is 15.424758
-# After step 9400, training accuracy 0.26 training loss is 16.697565
-# After step 9500, training accuracy 0.25 training loss is 15.939940
-# After step 9600, training accuracy 0.33 training loss is 15.316041
-# After step 9700, training accuracy 0.29 training loss is 15.969722
-# After step 9800, training accuracy 0.38 training loss is 13.062436
-# After step 9900, training accuracy 0.25 training loss is 16.055300
-# After step 10000, training accuracy 0.3 training loss is 13.375650
-# After step 10100, training accuracy 0.18 training loss is 16.345476
-# After step 10200, training accuracy 0.24 training loss is 15.270555
-# After step 10300, training accuracy 0.34 training loss is 13.417302
-# After step 10400, training accuracy 0.23 training loss is 15.635087
-# After step 10500, training accuracy 0.26 training loss is 16.391380
-# After step 10600, training accuracy 0.3 training loss is 15.170972
-# After step 10700, training accuracy 0.23 training loss is 13.958658
-# After step 10800, training accuracy 0.21 training loss is 16.209816
-# After step 10900, training accuracy 0.39 training loss is 12.522318
-# After step 11000, training accuracy 0.34 training loss is 13.060935
-# After step 11100, training accuracy 0.33 training loss is 14.003781
-# After step 11200, training accuracy 0.24 training loss is 14.424706
-# After step 11300, training accuracy 0.39 training loss is 11.724072
-# After step 11400, training accuracy 0.3 training loss is 14.601559
-# After step 11500, training accuracy 0.37 training loss is 11.090340
-# After step 11600, training accuracy 0.38 training loss is 12.118400
-# After step 11700, training accuracy 0.43 training loss is 10.365143
-# After step 11800, training accuracy 0.35 training loss is 11.489926
-# After step 11900, training accuracy 0.27 training loss is 9.908133
-# After step 12000, training accuracy 0.34 training loss is 11.938272
-# After step 12100, training accuracy 0.28 training loss is 12.435469
-# After step 12200, training accuracy 0.22 training loss is 12.589588
-# After step 12300, training accuracy 0.33 training loss is 11.512057
-# After step 12400, training accuracy 0.32 training loss is 9.782860
-# After step 12500, training accuracy 0.33 training loss is 12.303653
-# After step 12600, training accuracy 0.39 training loss is 10.893354
-# After step 12700, training accuracy 0.35 training loss is 12.500114
-# After step 12800, training accuracy 0.35 training loss is 12.350081
-# After step 12900, training accuracy 0.3 training loss is 10.912044
-# After step 13000, training accuracy 0.37 training loss is 9.973323
-# After step 13100, training accuracy 0.41 training loss is 10.522859
-# After step 13200, training accuracy 0.42 training loss is 9.206843
-# After step 13300, training accuracy 0.35 training loss is 9.332168
-# After step 13400, training accuracy 0.3 training loss is 9.885763
-# After step 13500, training accuracy 0.48 training loss is 7.753685
-# After step 13600, training accuracy 0.46 training loss is 8.497909
-# After step 13700, training accuracy 0.47 training loss is 7.246444
-# After step 13800, training accuracy 0.55 training loss is 7.199606
-# After step 13900, training accuracy 0.39 training loss is 9.681015
-# After step 14000, training accuracy 0.49 training loss is 7.191450
-# After step 14100, training accuracy 0.46 training loss is 8.248914
-# After step 14200, training accuracy 0.45 training loss is 8.787733
-# After step 14300, training accuracy 0.38 training loss is 9.410194
-# After step 14400, training accuracy 0.54 training loss is 7.268569
-# After step 14500, training accuracy 0.51 training loss is 7.735691
-# After step 14600, training accuracy 0.5 training loss is 7.911113
-# After step 14700, training accuracy 0.45 training loss is 7.724850
-# After step 14800, training accuracy 0.49 training loss is 6.838945
-# After step 14900, training accuracy 0.52 training loss is 6.807449
-# After step 15000, training accuracy 0.47 training loss is 7.442217
-# After step 15100, training accuracy 0.47 training loss is 7.019479
-# After step 15200, training accuracy 0.44 training loss is 7.163089
-# After step 15300, training accuracy 0.38 training loss is 7.915998
-# After step 15400, training accuracy 0.52 training loss is 6.883517
-# After step 15500, training accuracy 0.6 training loss is 5.207537
-# After step 15600, training accuracy 0.51 training loss is 7.629001
-# After step 15700, training accuracy 0.45 training loss is 7.804983
-# After step 15800, training accuracy 0.54 training loss is 5.126070
-# After step 15900, training accuracy 0.49 training loss is 6.683472
-# After step 16000, training accuracy 0.54 training loss is 6.535808
-# After step 16100, training accuracy 0.59 training loss is 5.801793
-# After step 16200, training accuracy 0.55 training loss is 5.793479
-# After step 16300, training accuracy 0.57 training loss is 4.898628
-# After step 16400, training accuracy 0.56 training loss is 5.964867
-# After step 16500, training accuracy 0.45 training loss is 4.915380
-# After step 16600, training accuracy 0.5 training loss is 6.577002
-# After step 16700, training accuracy 0.45 training loss is 8.666220
-# After step 16800, training accuracy 0.51 training loss is 7.133719
-# After step 16900, training accuracy 0.66 training loss is 3.828265
-# After step 17000, training accuracy 0.59 training loss is 5.518208
-# After step 17100, training accuracy 0.54 training loss is 5.595361
-# After step 17200, training accuracy 0.5 training loss is 6.036848
-# After step 17300, training accuracy 0.59 training loss is 3.998649
-# After step 17400, training accuracy 0.56 training loss is 5.053585
-# After step 17500, training accuracy 0.52 training loss is 3.855441
-# After step 17600, training accuracy 0.47 training loss is 5.733597
-# After step 17700, training accuracy 0.48 training loss is 7.179093
-# After step 17800, training accuracy 0.5 training loss is 7.064246
-# After step 17900, training accuracy 0.52 training loss is 6.785619
-# After step 18000, training accuracy 0.63 training loss is 4.637827
-# After step 18100, training accuracy 0.57 training loss is 4.794792
-# After step 18200, training accuracy 0.48 training loss is 6.016166
-# After step 18300, training accuracy 0.53 training loss is 5.485583
-# After step 18400, training accuracy 0.53 training loss is 5.451005
-# After step 18500, training accuracy 0.6 training loss is 3.275996
-# After step 18600, training accuracy 0.56 training loss is 5.071087
-# After step 18700, training accuracy 0.59 training loss is 4.206409
-# After step 18800, training accuracy 0.63 training loss is 3.726809
-# After step 18900, training accuracy 0.53 training loss is 3.776127
-# After step 19000, training accuracy 0.54 training loss is 3.587554
-# After step 19100, training accuracy 0.52 training loss is 4.419050
-# After step 19200, training accuracy 0.65 training loss is 2.744479
-# After step 19300, training accuracy 0.69 training loss is 2.146461
-# After step 19400, training accuracy 0.65 training loss is 3.951783
-# After step 19500, training accuracy 0.5 training loss is 3.116653
-# After step 19600, training accuracy 0.42 training loss is 4.622154
-# After step 19700, training accuracy 0.58 training loss is 4.686757
-# After step 19800, training accuracy 0.56 training loss is 4.964306
-# After step 19900, training accuracy 0.55 training loss is 5.224113
-# After step 20000, training accuracy 0.66 training loss is 3.095155
-# After step 20100, training accuracy 0.56 training loss is 3.577125
-# After step 20200, training accuracy 0.68 training loss is 2.733826
-# After step 20300, training accuracy 0.54 training loss is 2.963385
-# After step 20400, training accuracy 0.52 training loss is 3.700491
-# After step 20500, training accuracy 0.58 training loss is 2.930607
-# After step 20600, training accuracy 0.59 training loss is 2.900882
-# After step 20700, training accuracy 0.67 training loss is 2.240169
-# After step 20800, training accuracy 0.62 training loss is 2.372167
-# After step 20900, training accuracy 0.63 training loss is 2.561781
-# After step 21000, training accuracy 0.58 training loss is 2.974546
-# After step 21100, training accuracy 0.64 training loss is 2.222404
-# After step 21200, training accuracy 0.71 training loss is 1.757085
-# After step 21300, training accuracy 0.6 training loss is 3.239111
-# After step 21400, training accuracy 0.63 training loss is 1.705203
-# After step 21500, training accuracy 0.65 training loss is 2.383682
-# After step 21600, training accuracy 0.68 training loss is 1.572957
-# After step 21700, training accuracy 0.68 training loss is 1.792883
-# After step 21800, training accuracy 0.59 training loss is 2.598166
-# After step 21900, training accuracy 0.59 training loss is 2.384406
-# After step 22000, training accuracy 0.59 training loss is 3.003453
-# After step 22100, training accuracy 0.63 training loss is 1.937226
-# After step 22200, training accuracy 0.71 training loss is 1.936393
-# After step 22300, training accuracy 0.63 training loss is 2.108016
-# After step 22400, training accuracy 0.64 training loss is 2.262949
-# After step 22500, training accuracy 0.58 training loss is 2.231676
-# After step 22600, training accuracy 0.56 training loss is 1.956404
-# After step 22700, training accuracy 0.58 training loss is 2.575101
-# After step 22800, training accuracy 0.7 training loss is 1.765916
-# After step 22900, training accuracy 0.6 training loss is 1.981088
-# After step 23000, training accuracy 0.59 training loss is 2.014808
-# After step 23100, training accuracy 0.67 training loss is 2.279468
-# After step 23200, training accuracy 0.67 training loss is 1.919723
-# After step 23300, training accuracy 0.61 training loss is 2.155522
-# After step 23400, training accuracy 0.66 training loss is 1.969660
-# After step 23500, training accuracy 0.65 training loss is 2.209089
-# After step 23600, training accuracy 0.66 training loss is 1.663203
-# After step 23700, training accuracy 0.72 training loss is 1.589479
-# After step 23800, training accuracy 0.63 training loss is 1.500160
-# After step 23900, training accuracy 0.59 training loss is 2.184794
-# After step 24000, training accuracy 0.63 training loss is 2.486907
-# After step 24100, training accuracy 0.64 training loss is 2.471125
-# After step 24200, training accuracy 0.71 training loss is 1.935014
-# After step 24300, training accuracy 0.63 training loss is 1.777805
-# After step 24400, training accuracy 0.64 training loss is 1.918194
-# After step 24500, training accuracy 0.78 training loss is 1.463883
-# After step 24600, training accuracy 0.7 training loss is 1.430693
-# After step 24700, training accuracy 0.67 training loss is 1.813032
-# After step 24800, training accuracy 0.62 training loss is 1.981501
-# After step 24900, training accuracy 0.62 training loss is 1.959454
-# After step 25000, training accuracy 0.72 training loss is 1.336421
-# After step 25100, training accuracy 0.69 training loss is 2.063260
-# After step 25200, training accuracy 0.63 training loss is 1.338724
-# After step 25300, training accuracy 0.7 training loss is 1.418508
-# After step 25400, training accuracy 0.68 training loss is 1.370598
-# After step 25500, training accuracy 0.72 training loss is 1.357399
-# After step 25600, training accuracy 0.69 training loss is 1.649856
-# After step 25700, training accuracy 0.65 training loss is 1.779465
-# After step 25800, training accuracy 0.54 training loss is 1.823158
-# After step 25900, training accuracy 0.63 training loss is 1.544150
-# After step 26000, training accuracy 0.64 training loss is 1.615449
-# After step 26100, training accuracy 0.67 training loss is 2.025056
-# After step 26200, training accuracy 0.7 training loss is 1.285776
-# After step 26300, training accuracy 0.67 training loss is 1.700079
-# After step 26400, training accuracy 0.67 training loss is 1.678087
-# After step 26500, training accuracy 0.7 training loss is 1.434242
-# After step 26600, training accuracy 0.7 training loss is 1.777616
-# After step 26700, training accuracy 0.73 training loss is 1.504302
-# After step 26800, training accuracy 0.66 training loss is 1.606474
-# After step 26900, training accuracy 0.75 training loss is 1.597459
-# After step 27000, training accuracy 0.7 training loss is 1.292852
-# After step 27100, training accuracy 0.71 training loss is 1.343691
-# After step 27200, training accuracy 0.7 training loss is 1.260018
-# After step 27300, training accuracy 0.64 training loss is 1.912849
-# After step 27400, training accuracy 0.68 training loss is 1.838005
-# After step 27500, training accuracy 0.8 training loss is 1.160767
-# After step 27600, training accuracy 0.66 training loss is 1.903787
-# After step 27700, training accuracy 0.65 training loss is 1.731614
-# After step 27800, training accuracy 0.65 training loss is 1.630073
-# After step 27900, training accuracy 0.72 training loss is 1.607709
-# After step 28000, training accuracy 0.72 training loss is 1.307437
-# After step 28100, training accuracy 0.62 training loss is 2.085824
-# After step 28200, training accuracy 0.68 training loss is 1.143930
-# After step 28300, training accuracy 0.76 training loss is 1.188209
-# After step 28400, training accuracy 0.73 training loss is 0.995840
-# After step 28500, training accuracy 0.71 training loss is 1.861706
-# After step 28600, training accuracy 0.68 training loss is 1.835247
-# After step 28700, training accuracy 0.73 training loss is 0.996306
-# After step 28800, training accuracy 0.7 training loss is 1.311675
-# After step 28900, training accuracy 0.69 training loss is 1.490569
-# After step 29000, training accuracy 0.64 training loss is 1.660916
-# After step 29100, training accuracy 0.75 training loss is 1.146862
-# After step 29200, training accuracy 0.73 training loss is 1.052012
-# After step 29300, training accuracy 0.63 training loss is 1.614924
-# After step 29400, training accuracy 0.72 training loss is 1.230900
-# After step 29500, training accuracy 0.62 training loss is 1.552768
-# After step 29600, training accuracy 0.7 training loss is 1.395806
-# After step 29700, training accuracy 0.76 training loss is 1.286476
-# After step 29800, training accuracy 0.65 training loss is 1.366936
-# After step 29900, training accuracy 0.7 training loss is 1.755470
-# 2019-07-24 15:49:11.611268: W tensorflow/core/framework/allocator.cc:107] Allocation of 752640000 exceeds 10% of system memory.
-# 2019-07-24 15:49:11.772706: W tensorflow/core/framework/allocator.cc:107] Allocation of 752640000 exceeds 10% of system memory.
-# 2019-07-24 15:49:15.583549: W tensorflow/core/framework/allocator.cc:107] Allocation of 752640000 exceeds 10% of system memory.
-# 2019-07-24 15:49:15.744916: W tensorflow/core/framework/allocator.cc:107] Allocation of 752640000 exceeds 10% of system memory.
-# test accuracy 0.8221 test loss is 0.704569
-# validation accuracy is 0.91 val loss is 0.383206
+##一部分训练过程
+
+# After step 2500, training accuracy 0.11 training loss is 20.631170
+# test accuracy 0.11 ,test loss is 20.493008
+# validation accuracy is 0.08 ,val loss is 21.183784
+# After step 2600, training accuracy 0.09 training loss is 20.629143
+# test accuracy 0.09 ,test loss is 20.953524
+# validation accuracy is 0.12 ,val loss is 20.262749
+# After step 2700, training accuracy 0.11 training loss is 19.818325
+# test accuracy 0.12 ,test loss is 20.262749
+# validation accuracy is 0.08 ,val loss is 21.183784
+# After step 2800, training accuracy 0.09 training loss is 20.684128
+# test accuracy 0.1 ,test loss is 20.723267
+# validation accuracy is 0.08 ,val loss is 21.151003
+# After step 2900, training accuracy 0.04 training loss is 22.140034
+# test accuracy 0.03 ,test loss is 22.303749
+# validation accuracy is 0.1 ,val loss is 20.382765
+# After step 3000, training accuracy 0.15 training loss is 19.770458
+# test accuracy 0.14 ,test loss is 19.711866
+# validation accuracy is 0.13 ,val loss is 20.032490
+# After step 3100, training accuracy 0.2 training loss is 17.729908
+# test accuracy 0.13 ,test loss is 19.116764
+# validation accuracy is 0.22 ,val loss is 17.959959
+# After step 3200, training accuracy 0.23 training loss is 18.309219
+# test accuracy 0.2 ,test loss is 17.868164
+# validation accuracy is 0.17 ,val loss is 18.612488
+# After step 3300, training accuracy 0.27 training loss is 15.946198
+# test accuracy 0.12 ,test loss is 19.816610
+# validation accuracy is 0.19 ,val loss is 18.468884
+# After step 3400, training accuracy 0.12 training loss is 20.492884
+# test accuracy 0.13 ,test loss is 20.032486
+# validation accuracy is 0.12 ,val loss is 20.262629
+# After step 3500, training accuracy 0.06 training loss is 20.953222
+# test accuracy 0.07 ,test loss is 21.414028
+# validation accuracy is 0.11 ,val loss is 20.492826
+# After step 3600, training accuracy 0.12 training loss is 19.781393
+# test accuracy 0.14 ,test loss is 19.802231
+# validation accuracy is 0.13 ,val loss is 20.032490
+# After step 3700, training accuracy 0.08 training loss is 20.721716
+# test accuracy 0.12 ,test loss is 20.058067
+# validation accuracy is 0.14 ,val loss is 19.751139
+# After step 3800, training accuracy 0.18 training loss is 18.792675
+# test accuracy 0.17 ,test loss is 19.013931
+# validation accuracy is 0.16 ,val loss is 18.953564
+# After step 3900, training accuracy 0.23 training loss is 17.941029
+# test accuracy 0.23 ,test loss is 17.549736
+# validation accuracy is 0.19 ,val loss is 18.541000
+# After step 4000, training accuracy 0.15 training loss is 19.198257
+# test accuracy 0.21 ,test loss is 17.848743
+# validation accuracy is 0.25 ,val loss is 17.081099
+# After step 4100, training accuracy 0.2 training loss is 18.068865
+# test accuracy 0.24 ,test loss is 17.499668
+# validation accuracy is 0.2 ,val loss is 18.329306
+# After step 4200, training accuracy 0.22 training loss is 17.528803
+# test accuracy 0.23 ,test loss is 17.729904
+# validation accuracy is 0.17 ,val loss is 18.690769
+# After step 4300, training accuracy 0.26 training loss is 17.169495
+# test accuracy 0.28 ,test loss is 16.578611
+# validation accuracy is 0.16 ,val loss is 19.120321
+# After step 4400, training accuracy 0.22 training loss is 17.954948
+# test accuracy 0.24 ,test loss is 17.424583
+# validation accuracy is 0.19 ,val loss is 18.650938
+# After step 4500, training accuracy 0.18 training loss is 18.649414
+# test accuracy 0.18 ,test loss is 18.760633
+# validation accuracy is 0.26 ,val loss is 17.039139
+# After step 4600, training accuracy 0.21 training loss is 18.757771
+# test accuracy 0.22 ,test loss is 17.766859
+# validation accuracy is 0.17 ,val loss is 18.920042
+# After step 4700, training accuracy 0.19 training loss is 19.509150
+# test accuracy 0.19 ,test loss is 18.650938
+# validation accuracy is 0.18 ,val loss is 18.669226
+# After step 4800, training accuracy 0.18 training loss is 18.356012
+# test accuracy 0.19 ,test loss is 18.653391
+# validation accuracy is 0.25 ,val loss is 16.699663
+# After step 4900, training accuracy 0.13 training loss is 20.571770
+# test accuracy 0.11 ,test loss is 20.300690
+# validation accuracy is 0.29 ,val loss is 16.348669
+# After step 5000, training accuracy 0.17 training loss is 18.880760
+# test accuracy 0.19 ,test loss is 18.650938
+# validation accuracy is 0.17 ,val loss is 18.894974
+# After step 5100, training accuracy 0.21 training loss is 17.375145
+# test accuracy 0.24 ,test loss is 17.111492
+# validation accuracy is 0.21 ,val loss is 17.924740
+# After step 5200, training accuracy 0.17 training loss is 18.547428
+# test accuracy 0.25 ,test loss is 15.152561
+# validation accuracy is 0.18 ,val loss is 18.659002
+# After step 5300, training accuracy 0.21 training loss is 18.828051
+# test accuracy 0.18 ,test loss is 18.739983
+# validation accuracy is 0.17 ,val loss is 19.000265
+# After step 5400, training accuracy 0.12 training loss is 19.860836
+# test accuracy 0.13 ,test loss is 19.947582
+# validation accuracy is 0.18 ,val loss is 18.871197
+# After step 5500, training accuracy 0.13 training loss is 20.252193
+# test accuracy 0.15 ,test loss is 19.571972
+# validation accuracy is 0.2 ,val loss is 18.273636
+# After step 5600, training accuracy 0.11 training loss is 20.953524
+# test accuracy 0.1 ,test loss is 20.427017
+# validation accuracy is 0.22 ,val loss is 17.647087
+# After step 5700, training accuracy 0.23 training loss is 17.489569
+# test accuracy 0.24 ,test loss is 17.306005
+# validation accuracy is 0.22 ,val loss is 17.962868
+# After step 5800, training accuracy 0.16 training loss is 18.413980
+# test accuracy 0.2 ,test loss is 18.347948
+# validation accuracy is 0.21 ,val loss is 18.015318
+# After step 5900, training accuracy 0.17 training loss is 18.648367
+# test accuracy 0.19 ,test loss is 18.499411
+# validation accuracy is 0.28 ,val loss is 16.583485
+# After step 6000, training accuracy 0.2 training loss is 17.319765
+# test accuracy 0.26 ,test loss is 16.909134
+# validation accuracy is 0.23 ,val loss is 17.729904
+# After step 6100, training accuracy 0.22 training loss is 18.417673
+# test accuracy 0.23 ,test loss is 17.722895
+# validation accuracy is 0.2 ,val loss is 18.407461
+# After step 6200, training accuracy 0.25 training loss is 17.339298
+# test accuracy 0.2 ,test loss is 18.384127
+# validation accuracy is 0.31 ,val loss is 15.449014
+# After step 6300, training accuracy 0.18 training loss is 18.740555
+# test accuracy 0.23 ,test loss is 17.507488
+# validation accuracy is 0.21 ,val loss is 17.972466
+# After step 6400, training accuracy 0.18 training loss is 18.559790
+# test accuracy 0.24 ,test loss is 16.937969
+# validation accuracy is 0.28 ,val loss is 16.141809
+# After step 6500, training accuracy 0.34 training loss is 15.146499
+# test accuracy 0.33 ,test loss is 15.081622
+# validation accuracy is 0.25 ,val loss is 16.952972
+# After step 6600, training accuracy 0.21 training loss is 17.727646
+# test accuracy 0.28 ,test loss is 16.359690
+# validation accuracy is 0.35 ,val loss is 14.931065
+# After step 6700, training accuracy 0.31 training loss is 16.087154
+# test accuracy 0.27 ,test loss is 15.495953
+# validation accuracy is 0.29 ,val loss is 15.996944
+# After step 6800, training accuracy 0.24 training loss is 15.973668
+# test accuracy 0.32 ,test loss is 15.462735
+# validation accuracy is 0.16 ,val loss is 18.680513
+# After step 6900, training accuracy 0.29 training loss is 16.209351
+# test accuracy 0.3 ,test loss is 15.260778
+# validation accuracy is 0.23 ,val loss is 17.063108
+# After step 7000, training accuracy 0.25 training loss is 16.932703
+# test accuracy 0.2 ,test loss is 17.626585
+# validation accuracy is 0.34 ,val loss is 13.911949
+# After step 7100, training accuracy 0.23 training loss is 16.236792
+# test accuracy 0.26 ,test loss is 16.195637
+# validation accuracy is 0.16 ,val loss is 19.125141
+# After step 7200, training accuracy 0.15 training loss is 19.468977
+# test accuracy 0.15 ,test loss is 19.310743
+# validation accuracy is 0.22 ,val loss is 17.687349
+# After step 7300, training accuracy 0.19 training loss is 18.227768
+# test accuracy 0.21 ,test loss is 17.985085
+# validation accuracy is 0.22 ,val loss is 17.960163
+# After step 7400, training accuracy 0.16 training loss is 19.454473
+# test accuracy 0.15 ,test loss is 19.286400
+# validation accuracy is 0.26 ,val loss is 16.503786
+# After step 7500, training accuracy 0.26 training loss is 16.033987
+# test accuracy 0.29 ,test loss is 15.096319
+# validation accuracy is 0.25 ,val loss is 16.588812
+# After step 7600, training accuracy 0.23 training loss is 17.684486
+# test accuracy 0.25 ,test loss is 17.105782
+# validation accuracy is 0.28 ,val loss is 16.222084
+
 
 
 
