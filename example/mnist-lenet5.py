@@ -6,7 +6,7 @@ mnist = input_data.read_data_sets("/share/home/flt/flt_data/code/MNIST_data/", o
 batch_size = 100
 learning_rate = 0.01
 learning_rate_decay = 0.99
-max_steps = 30000
+max_steps = 1000
 
 #定义网络模型，模型结构：卷积1+池化1+卷积2+池化2+卷积3+池化3+全连接1+全连接2+全连接3
 def hidden_layer(input_tensor,regularizer,avg_class,resuse):
@@ -80,7 +80,7 @@ def hidden_layer(input_tensor,regularizer,avg_class,resuse):
     return result
 
 
-
+#训练可以吧下面这部分写成一个函数
 x = tf.placeholder(tf.float32, [batch_size ,784],name="x-input")
 images = tf.reshape(x, [batch_size,28,28,1])
 y_ = tf.placeholder(tf.float32, [batch_size, 10], name="y-input")
@@ -106,8 +106,15 @@ learning_rate = tf.train.exponential_decay(learning_rate,
                                  training_step, mnist.train.num_examples /batch_size ,
                                  learning_rate_decay, staircase=True)
 
+
+##输出不使用滑动平均的精度和loss
+crorent_predicition_noaverage = tf.equal(tf.arg_max(y,1),tf.argmax(y_,1))
+accuracy_noaverage = tf.reduce_mean(tf.cast(crorent_predicition_noaverage,tf.float32))
+
+
 train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss, global_step=training_step)
 
+#指定执行顺序，在执行完 train_step, variables_averages_op 操作之后，才能执行train_op 操作
 with tf.control_dependencies([train_step, variables_averages_op]):
     train_op = tf.no_op(name='train')
 
@@ -120,7 +127,7 @@ max_acc=0
 with tf.Session() as sess:
     tf.global_variables_initializer().run()
     for i in range(max_steps):
-        if i %1000==0:
+        if i %100==0:
             x_val, y_val = mnist.validation.next_batch(batch_size)
             validate_feed = {x: x_val, y_: y_val}
 
@@ -128,15 +135,51 @@ with tf.Session() as sess:
             print("After %d trainging step(s) ,validation accuracy"
                   "using average model is %g%%" % (i, validate_accuracy * 100))
 
+            x_train, y_train = mnist.train.next_batch(batch_size)
+            train_feed = {x: x_train, y_: y_train}
+
+            train_accuracy = sess.run(accuracy_noaverage, feed_dict=train_feed)
+            print("After %d trainging step(s) ,train accuracy"
+                  "not using average model is %g%%" % (i, train_accuracy * 100))
+
+            loss_value = sess.run(loss, feed_dict=train_feed)
+            print("After %d trainging step(s) ,train loss_value"
+                  "not using average model is %f" % (i, loss_value))
+
 
         x_train, y_train = mnist.train.next_batch(batch_size)
 
         sess.run(train_op, feed_dict={x: x_train, y_: y_train})
-        
+
         if validate_accuracy>max_acc:
             max_acc=validate_accuracy
             saver.save(sess,"model_save/mnist-lenet5-model.ckpt",global_step=i+1)
 
+            #训练过程如下
+After 200 trainging step(s) ,validation accuracyusing average model is 92%
+After 200 trainging step(s) ,train accuracynot using average model is 92%
+After 200 trainging step(s) ,train loss_valuenot using average model is 1.525790
+After 300 trainging step(s) ,validation accuracyusing average model is 96%
+After 300 trainging step(s) ,train accuracynot using average model is 94%
+After 300 trainging step(s) ,train loss_valuenot using average model is 1.474380
+After 400 trainging step(s) ,validation accuracyusing average model is 90%
+After 400 trainging step(s) ,train accuracynot using average model is 92%
+After 400 trainging step(s) ,train loss_valuenot using average model is 1.467097
+After 500 trainging step(s) ,validation accuracyusing average model is 95%
+After 500 trainging step(s) ,train accuracynot using average model is 93%
+After 500 trainging step(s) ,train loss_valuenot using average model is 1.474987
+After 600 trainging step(s) ,validation accuracyusing average model is 96%
+After 600 trainging step(s) ,train accuracynot using average model is 94%
+After 600 trainging step(s) ,train loss_valuenot using average model is 1.476646
+After 700 trainging step(s) ,validation accuracyusing average model is 98%
+After 700 trainging step(s) ,train accuracynot using average model is 97%
+After 700 trainging step(s) ,train loss_valuenot using average model is 1.374275
+After 800 trainging step(s) ,validation accuracyusing average model is 96%
+After 800 trainging step(s) ,train accuracynot using average model is 97%
+After 800 trainging step(s) ,train loss_valuenot using average model is 1.369796
+After 900 trainging step(s) ,validation accuracyusing average model is 97%
+After 900 trainging step(s) ,train accuracynot using average model is 96%
+After 900 trainging step(s) ,train loss_valuenot using average model is 1.395066
 
 
         
