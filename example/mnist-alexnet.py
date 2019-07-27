@@ -192,9 +192,11 @@ train_step = tf.train.AdagradOptimizer(1e-3).minimize(cross_entropy)
 # 计算准确率
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-tf.summary.scalar('accuracy', accuracy)
+trainaccuracy=tf.summary.scalar('trainaccuracy', accuracy)
+testaccuracy=tf.summary.scalar('testaccuracy', accuracy)
+valaccuracy=tf.summary.scalar('valaccuracy', accuracy)
 
-
+# tf.summary.scalar("validation_accuracy", accuracy)
 
 # 写到指定的磁盘路径中
 
@@ -203,30 +205,233 @@ TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 train_log_dir = 'tensorboard/train/' + TIMESTAMP
 writer_train = tf.summary.FileWriter(train_log_dir,sess.graph)
 
-saver = tf.train.Saver() 
-merged = tf.summary.merge_all()
+
+test_log_dir = 'tensorboard/test/' + TIMESTAMP
+writer_test = tf.summary.FileWriter(test_log_dir)
+
+
+val_log_dir = 'tensorboard/val/' + TIMESTAMP
+writer_val = tf.summary.FileWriter(val_log_dir)
+
+#merged = tf.summary.merge_all()
+merge_summary1 = tf.summary.merge([trainaccuracy])
+merge_summary2 = tf.summary.merge([testaccuracy])
+merge_summary3 = tf.summary.merge([valaccuracy])
+
 # 初始化全局变量
 tf.global_variables_initializer().run()
 
 
 ##训练过程
+saver=tf.train.Saver(max_to_keep=1)
+max_acc=0
 
-for i in range(25000):
+for i in range(30000):
     batch = mnist.train.next_batch(100)
     if i % 100 == 0:
         train_accuracy = accuracy.eval(feed_dict={x: batch[0], y_: batch[1],keep_prob:0.9})
         #print('step %d, training accuracy %g' % (i, train_accuracy))
-        _, loss_value = sess.run([train_step, cross_entropy],feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
+        loss_value = sess.run(cross_entropy,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
         print ('After step %d, training accuracy %g' % (i, train_accuracy),'training loss is %f'%(loss_value))
-        summary, _ = sess.run([merged, train_step],feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
+        summary,_= sess.run([merge_summary1,train_step],feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.9})
         writer_train.add_summary(summary, i)
+
+        if train_accuracy>max_acc:
+            max_acc=train_accuracy
+            saver.save(sess,"Model_save/mnist-alexnet-best-model.ckpt",global_step=i+1)
+
+
+        #测试过程
+        batch1 = mnist.test.next_batch(100)
+        test_accuracy=accuracy.eval(feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
+        test_loss_value = sess.run(cross_entropy,feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
+        print ('test accuracy %g' % (test_accuracy),',test loss is %f'%(test_loss_value))
+        summary2,_= sess.run([merge_summary2,train_step],feed_dict={x: batch1[0], y_: batch1[1],keep_prob:1})
+        writer_test.add_summary(summary2,i)
+
+
+        #验证过程
+        x_val, y_val = mnist.validation.next_batch(100)
+        validate_feed = {x: x_val, y_: y_val,keep_prob: 1.0}
+        validate_accuracy = sess.run(accuracy, feed_dict=validate_feed)
+        val_loss_value = sess.run(cross_entropy,feed_dict=validate_feed)
+        print ('validation accuracy is %g' % (validate_accuracy),',val loss is %f'%(val_loss_value))
+
+        summary3,_= sess.run([merge_summary3,train_step],feed_dict={x: batch[0], y_: batch[1],keep_prob:1})
+        writer_val.add_summary(summary3,i)
+
+
+        # summary, validate_accuracy = sess.run([merged, validate_accuracy],feed_dict=validate_feed)
+        # writer_val.add_summary(summary,i)
         #cross_entropy=sess.run(train_step,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.75})
         #print ('step %d, loss %f'%(i, cross_entropy))
     #loss=sess.run(train_step,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
     #print (loss)
     #train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
 
-saver.save(sess, "Model_save/mnist-alexnet-model3.ckpt")
+#saver.save(sess, "Model_save/mnist-alexnet-model3.ckpt")
 
-##测试过程
-print('test accuracy %g' % accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels,keep_prob:1}))
+##一部分训练过程
+
+# After step 2500, training accuracy 0.11 training loss is 20.631170
+# test accuracy 0.11 ,test loss is 20.493008
+# validation accuracy is 0.08 ,val loss is 21.183784
+# After step 2600, training accuracy 0.09 training loss is 20.629143
+# test accuracy 0.09 ,test loss is 20.953524
+# validation accuracy is 0.12 ,val loss is 20.262749
+# After step 2700, training accuracy 0.11 training loss is 19.818325
+# test accuracy 0.12 ,test loss is 20.262749
+# validation accuracy is 0.08 ,val loss is 21.183784
+# After step 2800, training accuracy 0.09 training loss is 20.684128
+# test accuracy 0.1 ,test loss is 20.723267
+# validation accuracy is 0.08 ,val loss is 21.151003
+# After step 2900, training accuracy 0.04 training loss is 22.140034
+# test accuracy 0.03 ,test loss is 22.303749
+# validation accuracy is 0.1 ,val loss is 20.382765
+# After step 3000, training accuracy 0.15 training loss is 19.770458
+# test accuracy 0.14 ,test loss is 19.711866
+# validation accuracy is 0.13 ,val loss is 20.032490
+# After step 3100, training accuracy 0.2 training loss is 17.729908
+# test accuracy 0.13 ,test loss is 19.116764
+# validation accuracy is 0.22 ,val loss is 17.959959
+# After step 3200, training accuracy 0.23 training loss is 18.309219
+# test accuracy 0.2 ,test loss is 17.868164
+# validation accuracy is 0.17 ,val loss is 18.612488
+# After step 3300, training accuracy 0.27 training loss is 15.946198
+# test accuracy 0.12 ,test loss is 19.816610
+# validation accuracy is 0.19 ,val loss is 18.468884
+# After step 3400, training accuracy 0.12 training loss is 20.492884
+# test accuracy 0.13 ,test loss is 20.032486
+# validation accuracy is 0.12 ,val loss is 20.262629
+# After step 3500, training accuracy 0.06 training loss is 20.953222
+# test accuracy 0.07 ,test loss is 21.414028
+# validation accuracy is 0.11 ,val loss is 20.492826
+# After step 3600, training accuracy 0.12 training loss is 19.781393
+# test accuracy 0.14 ,test loss is 19.802231
+# validation accuracy is 0.13 ,val loss is 20.032490
+# After step 3700, training accuracy 0.08 training loss is 20.721716
+# test accuracy 0.12 ,test loss is 20.058067
+# validation accuracy is 0.14 ,val loss is 19.751139
+# After step 3800, training accuracy 0.18 training loss is 18.792675
+# test accuracy 0.17 ,test loss is 19.013931
+# validation accuracy is 0.16 ,val loss is 18.953564
+# After step 3900, training accuracy 0.23 training loss is 17.941029
+# test accuracy 0.23 ,test loss is 17.549736
+# validation accuracy is 0.19 ,val loss is 18.541000
+# After step 4000, training accuracy 0.15 training loss is 19.198257
+# test accuracy 0.21 ,test loss is 17.848743
+# validation accuracy is 0.25 ,val loss is 17.081099
+# After step 4100, training accuracy 0.2 training loss is 18.068865
+# test accuracy 0.24 ,test loss is 17.499668
+# validation accuracy is 0.2 ,val loss is 18.329306
+# After step 4200, training accuracy 0.22 training loss is 17.528803
+# test accuracy 0.23 ,test loss is 17.729904
+# validation accuracy is 0.17 ,val loss is 18.690769
+# After step 4300, training accuracy 0.26 training loss is 17.169495
+# test accuracy 0.28 ,test loss is 16.578611
+# validation accuracy is 0.16 ,val loss is 19.120321
+# After step 4400, training accuracy 0.22 training loss is 17.954948
+# test accuracy 0.24 ,test loss is 17.424583
+# validation accuracy is 0.19 ,val loss is 18.650938
+# After step 4500, training accuracy 0.18 training loss is 18.649414
+# test accuracy 0.18 ,test loss is 18.760633
+# validation accuracy is 0.26 ,val loss is 17.039139
+# After step 4600, training accuracy 0.21 training loss is 18.757771
+# test accuracy 0.22 ,test loss is 17.766859
+# validation accuracy is 0.17 ,val loss is 18.920042
+# After step 4700, training accuracy 0.19 training loss is 19.509150
+# test accuracy 0.19 ,test loss is 18.650938
+# validation accuracy is 0.18 ,val loss is 18.669226
+# After step 4800, training accuracy 0.18 training loss is 18.356012
+# test accuracy 0.19 ,test loss is 18.653391
+# validation accuracy is 0.25 ,val loss is 16.699663
+# After step 4900, training accuracy 0.13 training loss is 20.571770
+# test accuracy 0.11 ,test loss is 20.300690
+# validation accuracy is 0.29 ,val loss is 16.348669
+# After step 5000, training accuracy 0.17 training loss is 18.880760
+# test accuracy 0.19 ,test loss is 18.650938
+# validation accuracy is 0.17 ,val loss is 18.894974
+# After step 5100, training accuracy 0.21 training loss is 17.375145
+# test accuracy 0.24 ,test loss is 17.111492
+# validation accuracy is 0.21 ,val loss is 17.924740
+# After step 5200, training accuracy 0.17 training loss is 18.547428
+# test accuracy 0.25 ,test loss is 15.152561
+# validation accuracy is 0.18 ,val loss is 18.659002
+# After step 5300, training accuracy 0.21 training loss is 18.828051
+# test accuracy 0.18 ,test loss is 18.739983
+# validation accuracy is 0.17 ,val loss is 19.000265
+# After step 5400, training accuracy 0.12 training loss is 19.860836
+# test accuracy 0.13 ,test loss is 19.947582
+# validation accuracy is 0.18 ,val loss is 18.871197
+# After step 5500, training accuracy 0.13 training loss is 20.252193
+# test accuracy 0.15 ,test loss is 19.571972
+# validation accuracy is 0.2 ,val loss is 18.273636
+# After step 5600, training accuracy 0.11 training loss is 20.953524
+# test accuracy 0.1 ,test loss is 20.427017
+# validation accuracy is 0.22 ,val loss is 17.647087
+# After step 5700, training accuracy 0.23 training loss is 17.489569
+# test accuracy 0.24 ,test loss is 17.306005
+# validation accuracy is 0.22 ,val loss is 17.962868
+# After step 5800, training accuracy 0.16 training loss is 18.413980
+# test accuracy 0.2 ,test loss is 18.347948
+# validation accuracy is 0.21 ,val loss is 18.015318
+# After step 5900, training accuracy 0.17 training loss is 18.648367
+# test accuracy 0.19 ,test loss is 18.499411
+# validation accuracy is 0.28 ,val loss is 16.583485
+# After step 6000, training accuracy 0.2 training loss is 17.319765
+# test accuracy 0.26 ,test loss is 16.909134
+# validation accuracy is 0.23 ,val loss is 17.729904
+# After step 6100, training accuracy 0.22 training loss is 18.417673
+# test accuracy 0.23 ,test loss is 17.722895
+# validation accuracy is 0.2 ,val loss is 18.407461
+# After step 6200, training accuracy 0.25 training loss is 17.339298
+# test accuracy 0.2 ,test loss is 18.384127
+# validation accuracy is 0.31 ,val loss is 15.449014
+# After step 6300, training accuracy 0.18 training loss is 18.740555
+# test accuracy 0.23 ,test loss is 17.507488
+# validation accuracy is 0.21 ,val loss is 17.972466
+# After step 6400, training accuracy 0.18 training loss is 18.559790
+# test accuracy 0.24 ,test loss is 16.937969
+# validation accuracy is 0.28 ,val loss is 16.141809
+# After step 6500, training accuracy 0.34 training loss is 15.146499
+# test accuracy 0.33 ,test loss is 15.081622
+# validation accuracy is 0.25 ,val loss is 16.952972
+# After step 6600, training accuracy 0.21 training loss is 17.727646
+# test accuracy 0.28 ,test loss is 16.359690
+# validation accuracy is 0.35 ,val loss is 14.931065
+# After step 6700, training accuracy 0.31 training loss is 16.087154
+# test accuracy 0.27 ,test loss is 15.495953
+# validation accuracy is 0.29 ,val loss is 15.996944
+# After step 6800, training accuracy 0.24 training loss is 15.973668
+# test accuracy 0.32 ,test loss is 15.462735
+# validation accuracy is 0.16 ,val loss is 18.680513
+# After step 6900, training accuracy 0.29 training loss is 16.209351
+# test accuracy 0.3 ,test loss is 15.260778
+# validation accuracy is 0.23 ,val loss is 17.063108
+# After step 7000, training accuracy 0.25 training loss is 16.932703
+# test accuracy 0.2 ,test loss is 17.626585
+# validation accuracy is 0.34 ,val loss is 13.911949
+# After step 7100, training accuracy 0.23 training loss is 16.236792
+# test accuracy 0.26 ,test loss is 16.195637
+# validation accuracy is 0.16 ,val loss is 19.125141
+# After step 7200, training accuracy 0.15 training loss is 19.468977
+# test accuracy 0.15 ,test loss is 19.310743
+# validation accuracy is 0.22 ,val loss is 17.687349
+# After step 7300, training accuracy 0.19 training loss is 18.227768
+# test accuracy 0.21 ,test loss is 17.985085
+# validation accuracy is 0.22 ,val loss is 17.960163
+# After step 7400, training accuracy 0.16 training loss is 19.454473
+# test accuracy 0.15 ,test loss is 19.286400
+# validation accuracy is 0.26 ,val loss is 16.503786
+# After step 7500, training accuracy 0.26 training loss is 16.033987
+# test accuracy 0.29 ,test loss is 15.096319
+# validation accuracy is 0.25 ,val loss is 16.588812
+# After step 7600, training accuracy 0.23 training loss is 17.684486
+# test accuracy 0.25 ,test loss is 17.105782
+# validation accuracy is 0.28 ,val loss is 16.222084
+
+
+
+
+
+
